@@ -13,7 +13,9 @@ import { v4 as uuid, validate as validateUuid } from 'uuid';
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors());
+app.use(cors({
+    credentials: true,
+}));
 
 type ImaginaryDBSchema = {
     users: {
