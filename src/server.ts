@@ -28,7 +28,7 @@ app.use(bodyParser.json());
 
 app.use(cors({
     credentials: true,
-    origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com'],
+    origin: ['http://localhost:3000', 'https://ubiquiti-hw-todo-client-kpj59.ondigitalocean.app'],
 }));
 
 // let sessionStore;
@@ -48,8 +48,8 @@ const todoSession = session({
     saveUninitialized: true,
     proxy: true,
     cookie: {
-        httpOnly: true,
-        secure: false,
+        httpOnly: false,
+        secure: 'auto',
     }
 
 });
