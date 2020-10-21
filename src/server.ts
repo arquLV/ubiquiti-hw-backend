@@ -13,10 +13,11 @@ import { v4 as uuid, validate as validateUuid } from 'uuid';
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors({
-    credentials: true,
-    origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
-}));
+app.use(cors());
+// app.use(cors({
+//     credentials: true,
+//     origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
+// }));
 
 type ImaginaryDBSchema = {
     users: {
@@ -69,6 +70,7 @@ const getListIndex = (listId: string) => {
 // app.post('/auth', )
 
 app.get('/todos', (req, res) => {
+    console.log(req.headers);
     res.json({
         lists: imaginaryDB.lists,   
     });
