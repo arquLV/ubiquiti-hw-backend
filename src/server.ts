@@ -30,6 +30,7 @@ if (process.env.NODE_ENV === 'development') {
         origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
     }));
 } else {
+    console.log('YEEEET');
     app.use(cors());
 }
 
