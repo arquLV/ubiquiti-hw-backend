@@ -4,23 +4,44 @@ import express from 'express';
 import socketIo from 'socket.io';
 
 import cors from 'cors';
+import bodyParser from 'body-parser';
+
+import session from 'express-session';
+import sharedSession from 'express-socket.io-session';
 
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 
 import { v4 as uuid, validate as validateUuid } from 'uuid';
+import bcrypt from 'bcrypt';
+
+import { generateRandomColor, ClientError } from 'utils';
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors());
-// app.use(cors({
-//     credentials: true,
-//     origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
-// }));
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(bodyParser.json());
+
+app.use(cors({
+    credentials: true,
+    origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
+}));
+
+const todoSession = session({
+    secret: 'SHOULD_BE_FROM_ENV',
+    resave: false,
+    saveUninitialized: false,
+});
+app.use(todoSession);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 
 type ImaginaryDBSchema = {
     users: {
+        id: string,
         username: string,
         pwdHash: string,
         color: string,
@@ -58,26 +79,116 @@ const getListIndex = (listId: string) => {
 }
 
 
-// passport.use('local', new LocalStrategy({
-//     usernameField: 'username',
-//     passwordField: 'password',
-// }, (username, password, done) => {
-//     // DB call goes here
+passport.serializeUser((user: any, done) => {
+    console.log(`SERIALIZE`);
+    console.log(user);
+    done(null, user.id);
+});
+passport.deserializeUser((id: string, done) => {
+    console.log('DESERIALIZE');
+    console.log(id);
+   const user = imaginaryDB.users.find(user => user.id === id);
+   if (user) {
+       done(null, user);
+   } else {
+       done('Invalid');
+   }
+});
+
+passport.use('local', new LocalStrategy({
+    usernameField: 'username',
+    passwordField: 'password',
+}, async (username, password, done) => {
+    try {
+        const user = imaginaryDB.users.find(user => user.username === username);
+        if (!user) {
+            return done(new ClientError('Invalid login', 401))
+        }
+
+        const isMatchingPassword = await bcrypt.compare(password, user.pwdHash);
+
+        if (isMatchingPassword) {
+            return done(null, user);
+        } else {
+            return done(new ClientError('Invalid login', 401))
+        }
+    } catch (error) {
+        console.error(error);
+        return done(error);
+    }
 
 
-// }));
+}));
 
-// app.post('/auth', )
+app.post('/login', passport.authenticate('local', {
+    failWithError: true,
+}), (req, res) => {
+    console.log(req.user);
+});
+
+app.post('/signup', async (req, res, next) => {
+    const { username, password } = req.body;
+    if (imaginaryDB.users.find(user => user.username === username) !== undefined) {
+        return next(new ClientError('User already exists', 409));
+    }
+
+    try {
+        const pwdHash = await bcrypt.hash(password, 12);
+        
+        const newUser = {
+            id: uuid(),
+            username,
+            pwdHash,
+            color: generateRandomColor(),
+        };
+        console.log(newUser);
+        imaginaryDB.users.push(newUser);
+
+        req.logIn(newUser, err => {
+            if (err) {
+                throw err;
+            }
+
+            res.json({
+                username: newUser.username,
+                color: newUser.color,
+            });
+        });
+    } catch (e) {
+        console.error(e);
+        next(e);
+    }
+});
+
+app.post('/checkAuth', (req, res) => {
+    const user = req.user as { username: string, color: string };
+    if (user) {
+        res.json({
+            success: true,
+            user: {
+                username: user.username,
+                color: user.color,
+            }
+        });
+    } else {
+        res.json({
+            success: false,
+        });
+    }
+});
 
 app.get('/todos', (req, res) => {
-    console.log(req.headers);
     res.json({
         lists: imaginaryDB.lists,   
     });
 });
 
+
 const httpServer = http.createServer(app);
 const io = socketIo(httpServer);
+io.use(sharedSession(todoSession, {
+    autoSave: true,
+}));
  
 io.on('connection', socket => {
     console.log(`New connection: ${socket.id}`);
@@ -128,7 +239,7 @@ io.on('connection', socket => {
             listId, 
             data: { tempId, label }
         } = itemRequest;
-        console.log(itemRequest);
+
         const listIdx = getListIndex(listId);
         const list = imaginaryDB.lists[listIdx];
         
