@@ -23,16 +23,17 @@ const port = process.env.PORT || 3001;
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
+app.enable('trust proxy');
 app.use(cors({
     credentials: true,
     origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com'],
 }));
 
-
 const todoSession = session({
     secret: 'SHOULD_BE_FROM_ENV',
     resave: false,
     saveUninitialized: false,
+    proxy: true,
 });
 app.use(todoSession);
 
