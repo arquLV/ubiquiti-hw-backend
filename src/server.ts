@@ -25,7 +25,7 @@ const port = process.env.PORT || 3001;
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
-app.set('trust proxy', 1);
+
 app.use(cors({
     credentials: true,
     origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com'],
@@ -41,14 +41,15 @@ app.use(cors({
 //     sessionStore = redisClient;
 // }
 
+app.set('trust proxy', 1);
 const todoSession = session({
     secret: 'SHOULD_BE_FROM_ENV',
     resave: false,
     saveUninitialized: true,
     proxy: true,
     cookie: {
-        httpOnly: false,
-        secure: true,
+        httpOnly: true,
+        secure: false,
     }
 
 });
@@ -147,6 +148,8 @@ app.post('/signup', async (req, res, next) => {
         return next(new ClientError('User already exists', 409));
     }
 
+    res.cookie('test', 'yolo');
+
     try {
         const pwdHash = await bcrypt.hash(password, 12);
 
@@ -176,6 +179,7 @@ app.post('/signup', async (req, res, next) => {
 });
 
 app.post('/checkAuth', (req, res) => {
+    console.log(req.cookies);
     const user = req.user as { username: string, color: string };
     if (user) {
         res.json({
