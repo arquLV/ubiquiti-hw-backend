@@ -96,7 +96,7 @@ passport.use('local', new LocalStrategy({
     passwordField: 'password',
 }, async (username, password, done) => {
     try {
-        const user = imaginaryDB.users.find(user => user.username === username);
+        const user = imaginaryDB.users.find(u => u.username === username);
         if (!user) {
             return done(new ClientError('Invalid login', 401))
         }
