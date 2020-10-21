@@ -11,7 +11,7 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import { v4 as uuid, validate as validateUuid } from 'uuid';
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 app.use(cors());
 
