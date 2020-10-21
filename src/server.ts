@@ -23,11 +23,6 @@ const port = process.env.PORT || 3001;
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
-app.use((req, res, next) => {
-    console.log(req);
-    next();
-});
-
 app.use(cors({
     credentials: true,
     origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com'],
