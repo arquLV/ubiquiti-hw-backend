@@ -12,7 +12,7 @@ import sharedSession from 'express-socket.io-session';
 
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
-import connectRedis from 'connect-redis';
+// import redis from 'redis';
 
 import { v4 as uuid, validate as validateUuid } from 'uuid';
 import bcrypt from 'bcrypt';
@@ -25,33 +25,31 @@ const port = process.env.PORT || 3001;
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
-app.enable('trust proxy');
+app.set('trust proxy', 1);
 app.use(cors({
     credentials: true,
     origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com'],
 }));
 
-let sessionStore = undefined;
-if (process.env.REDISTOGO_URL) {
-    const RedisStore = connectRedis(express);
-    const redisUrl = url.parse(process.env.REDISTOGO_URL);
-    const redisAuth = redisUrl.auth.split(':');
+// let sessionStore;
+// if (process.env.REDISTOGO_URL) {
 
-    sessionStore = new RedisStore({
-        host: redisUrl.hostname,
-        port: redisUrl.port as unknown as number,
-        db: redisAuth[0] as unknown as number,
-        pass: redisAuth[1],
-    });
-}
+//     const redisUrl = url.parse(process.env.REDISTOGO_URL);
+//     const redisClient = redis.createClient(redisUrl.port as unknown as number, redisUrl.hostname);
+//     redisClient.auth(redisUrl.auth.split(':')[1]);
+//     redisClient.
+//     sessionStore = redisClient;
+// }
 
 const todoSession = session({
     secret: 'SHOULD_BE_FROM_ENV',
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     proxy: true,
+    cookie: {
+        httpOnly: false,
+    }
 
-    store: sessionStore,
 });
 app.use(todoSession);
 
