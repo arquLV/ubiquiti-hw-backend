@@ -5,12 +5,14 @@ import socketIo from 'socket.io';
 
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import url from 'url';
 
 import session from 'express-session';
 import sharedSession from 'express-socket.io-session';
 
 import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
+import connectRedis from 'connect-redis';
 
 import { v4 as uuid, validate as validateUuid } from 'uuid';
 import bcrypt from 'bcrypt';
@@ -29,11 +31,27 @@ app.use(cors({
     origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com'],
 }));
 
+let sessionStore = undefined;
+if (process.env.REDISTOGO_URL) {
+    const RedisStore = connectRedis(express);
+    const redisUrl = url.parse(process.env.REDISTOGO_URL);
+    const redisAuth = redisUrl.auth.split(':');
+
+    sessionStore = new RedisStore({
+        host: redisUrl.hostname,
+        port: redisUrl.port as unknown as number,
+        db: redisAuth[0] as unknown as number,
+        pass: redisAuth[1],
+    });
+}
+
 const todoSession = session({
     secret: 'SHOULD_BE_FROM_ENV',
     resave: false,
     saveUninitialized: false,
     proxy: true,
+
+    store: sessionStore,
 });
 app.use(todoSession);
 
