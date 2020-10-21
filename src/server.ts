@@ -79,15 +79,11 @@ const getListIndex = (listId: string) => {
 }
 
 
-passport.serializeUser((user: any, done) => {
-    console.log(`SERIALIZE`);
-    console.log(user);
+passport.serializeUser((user: { id: string }, done) => {
     done(null, user.id);
 });
 passport.deserializeUser((id: string, done) => {
-    console.log('DESERIALIZE');
-    console.log(id);
-   const user = imaginaryDB.users.find(user => user.id === id);
+   const user = imaginaryDB.users.find(u => u.id === id);
    if (user) {
        done(null, user);
    } else {
@@ -191,108 +187,142 @@ io.use(sharedSession(todoSession, {
 }));
  
 io.on('connection', socket => {
-    console.log(`New connection: ${socket.id}`);
+    socket.handshake.session.reload(async err => {
+        if (err) {
+            console.log('Unknown user socket connection request.');
+            // console.error(err);
+            return;
+        }
 
-    socket.on('todo/create', () => {
-        const listId = uuid();
+        const socketUserId = socket.handshake.session.passport.user;
 
-        const listsLength = imaginaryDB.lists.push({
-            id: listId,
-            title: '',
-            items: [],
+        const socketUser = imaginaryDB.users.find(u => u.id === socketUserId);
+        const socketUserName = socketUser.username;
+
+        console.log(`New connection! User ${socketUserId} on ${socket.id}`);
+
+        // Let others know!
+        socket.broadcast.emit('users/new', {
+            username: socketUserName,
+            color: socketUser.color,
         });
-        imaginaryDB.listsIndex[listId] = listsLength - 1;
 
-        io.emit('todo/add', {
-            listId,
+        socket.on('todo/create', () => {
+            const listId = uuid();
+    
+            const listsLength = imaginaryDB.lists.push({
+                id: listId,
+                title: '',
+                items: [],
+            });
+            imaginaryDB.listsIndex[listId] = listsLength - 1;
+    
+            io.emit('todo/add', {
+                listId,
+            });
+    
+        });
+    
+        type TodoUpdateRequest = {
+            listId: string,
+            data: {
+                title?: string,
+            }
+        }
+        socket.on('todo/update', (update: TodoUpdateRequest) => {
+            const listIdx = getListIndex(update.listId);
+            const list = imaginaryDB.lists[listIdx];
+    
+            const { data } = update;
+            if (data.title !== undefined) {
+                list.title = data.title;
+            }
+    
+            socket.broadcast.emit('todo/update', update);
+        });
+    
+        type TodoNewItemRequest = {
+            listId: string,
+            data: {
+                tempId: string,
+                label: string,
+            }
+        }
+        socket.on('todo/addItem', (itemRequest: TodoNewItemRequest) => {
+            const { 
+                listId, 
+                data: { tempId, label }
+            } = itemRequest;
+    
+            const listIdx = getListIndex(listId);
+            const list = imaginaryDB.lists[listIdx];
+            
+            let id = tempId;
+            if (validateUuid(tempId) === false) {
+                id = uuid();
+    
+                // TODO: emit correction here
+            }
+    
+            const newItem = {
+                id,
+                label,
+                isDone: false,
+            };
+            console.log(newItem);
+            list.items.push(newItem);
+    
+            socket.broadcast.emit('todo/addItem', {
+                listId: itemRequest.listId,
+                data: newItem,
+            });
+        });
+    
+        type TodoEditItemRequest = {
+            listId: string,
+            itemId: string,
+            data: {
+                label?: string,
+                isDone?: boolean,
+            }
+        }
+        socket.on('todo/editItem', (itemRequest: TodoEditItemRequest) => {
+            const { 
+                listId,
+                itemId, 
+                data: { label, isDone }
+            } = itemRequest;
+    
+            const listIdx = getListIndex(listId);
+            const list = imaginaryDB.lists[listIdx];
+    
+            const itemIdx = list.items.findIndex(item => item.id === itemId);
+            
+            if (label !== undefined) {
+                list.items[itemIdx].label = label;
+            }
+            if (isDone !== undefined) {
+                list.items[itemIdx].isDone = isDone;
+            }
+    
+            socket.broadcast.emit('todo/editItem', itemRequest);
         });
 
-    });
-
-    type TodoUpdateRequest = {
-        listId: string,
-        data: {
-            title?: string,
+        type UserCursorUpdate = {
+            id: string[],
+            start: number,
+            end: number,
         }
-    }
-    socket.on('todo/update', (update: TodoUpdateRequest) => {
-        const listIdx = getListIndex(update.listId);
-        const list = imaginaryDB.lists[listIdx];
-
-        const { data } = update;
-        if (data.title !== undefined) {
-            list.title = data.title;
-        }
-
-        socket.broadcast.emit('todo/update', update);
-    });
-
-    type TodoNewItemRequest = {
-        listId: string,
-        data: {
-            tempId: string,
-            label: string,
-        }
-    }
-    socket.on('todo/addItem', (itemRequest: TodoNewItemRequest) => {
-        const { 
-            listId, 
-            data: { tempId, label }
-        } = itemRequest;
-
-        const listIdx = getListIndex(listId);
-        const list = imaginaryDB.lists[listIdx];
-        
-        let id = tempId;
-        if (validateUuid(tempId) === false) {
-            id = uuid();
-
-            // TODO: emit correction here
-        }
-
-        const newItem = {
-            id,
-            label,
-            isDone: false,
-        };
-        console.log(newItem);
-        list.items.push(newItem);
-
-        socket.broadcast.emit('todo/addItem', {
-            listId: itemRequest.listId,
-            data: newItem,
+        socket.on('user-cursor', (update: UserCursorUpdate) => {
+            socket.broadcast.emit('user-cursor', {
+                username: socketUserName,
+                id: update.id,
+                start: update.start,
+                end: update.end,
+            });
         });
     });
 
-    type TodoEditItemRequest = {
-        listId: string,
-        itemId: string,
-        data: {
-            label?: string,
-            isDone?: boolean,
-        }
-    }
-    socket.on('todo/editItem', (itemRequest: TodoEditItemRequest) => {
-        const { 
-            listId,
-            itemId, 
-            data: { label, isDone }
-        } = itemRequest;
-
-        const listIdx = getListIndex(listId);
-        const list = imaginaryDB.lists[listIdx];
-
-        const itemIdx = list.items.findIndex(item => item.id === itemId);
-        
-        if (label !== undefined) {
-            list.items[itemIdx].label = label;
-        }
-        if (isDone !== undefined) {
-            list.items[itemIdx].isDone = isDone;
-        }
-
-        socket.broadcast.emit('todo/editItem', itemRequest);
-    });
 });
 
 httpServer.listen(port, () => { console.log (`Listening on port ${port}`)});
