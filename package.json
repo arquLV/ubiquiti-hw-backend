@@ -34,5 +34,8 @@
     "prebuild": "tslint -c tslint.json -p tsconfig.json --fix",
     "build": "tsc --project tsconfig.json && cp package.json build/package.json && cp tsconfig.build.json build/tsconfig.json",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": "12.4"
   }
 }
