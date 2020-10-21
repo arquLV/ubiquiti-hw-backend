@@ -48,6 +48,7 @@ const todoSession = session({
     proxy: true,
     cookie: {
         httpOnly: false,
+        secure: true,
     }
 
 });
