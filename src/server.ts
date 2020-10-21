@@ -15,6 +15,7 @@ const port = process.env.PORT || 3001;
 
 app.use(cors({
     credentials: true,
+    origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
 }));
 
 type ImaginaryDBSchema = {
