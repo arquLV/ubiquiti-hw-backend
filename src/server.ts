@@ -23,10 +23,15 @@ const port = process.env.PORT || 3001;
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
-app.use(cors({
-    credentials: true,
-    origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
-}));
+
+if (process.env.NODE_ENV === 'development') {
+    app.use(cors({
+        credentials: true,
+        origin: ['http://localhost:3000', 'https://murmuring-brook-39256.herokuapp.com/'],
+    }));
+} else {
+    app.use(cors());
+}
 
 const todoSession = session({
     secret: 'SHOULD_BE_FROM_ENV',
