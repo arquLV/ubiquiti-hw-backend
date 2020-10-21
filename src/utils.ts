@@ -21,5 +21,5 @@ export class ClientError extends Error {
         this.sendReason = typeof sendReason === 'boolean' ? sendReason : true;
         this.code = code || 404;
         this.date = new Date();
-    }   
+    }
 }

@@ -15,7 +15,7 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import { v4 as uuid, validate as validateUuid } from 'uuid';
 import bcrypt from 'bcrypt';
 
-import { generateRandomColor, ClientError } from 'utils';
+import { generateRandomColor, ClientError } from './utils';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -136,7 +136,7 @@ app.post('/signup', async (req, res, next) => {
 
     try {
         const pwdHash = await bcrypt.hash(password, 12);
-        
+
         const newUser = {
             id: uuid(),
             username,
@@ -181,7 +181,7 @@ app.post('/checkAuth', (req, res) => {
 
 app.get('/todos', (req, res) => {
     res.json({
-        lists: imaginaryDB.lists,   
+        lists: imaginaryDB.lists,
     });
 });
 
@@ -191,7 +191,7 @@ const io = socketIo(httpServer);
 io.use(sharedSession(todoSession, {
     autoSave: true,
 }));
- 
+
 io.on('connection', socket => {
     socket.handshake.session.reload(async err => {
         if (err) {
@@ -215,20 +215,20 @@ io.on('connection', socket => {
 
         socket.on('todo/create', () => {
             const listId = uuid();
-    
+
             const listsLength = imaginaryDB.lists.push({
                 id: listId,
                 title: '',
                 items: [],
             });
             imaginaryDB.listsIndex[listId] = listsLength - 1;
-    
+
             io.emit('todo/add', {
                 listId,
             });
-    
+
         });
-    
+
         type TodoUpdateRequest = {
             listId: string,
             data: {
@@ -238,15 +238,15 @@ io.on('connection', socket => {
         socket.on('todo/update', (update: TodoUpdateRequest) => {
             const listIdx = getListIndex(update.listId);
             const list = imaginaryDB.lists[listIdx];
-    
+
             const { data } = update;
             if (data.title !== undefined) {
                 list.title = data.title;
             }
-    
+
             socket.broadcast.emit('todo/update', update);
         });
-    
+
         type TodoNewItemRequest = {
             listId: string,
             data: {
@@ -255,21 +255,21 @@ io.on('connection', socket => {
             }
         }
         socket.on('todo/addItem', (itemRequest: TodoNewItemRequest) => {
-            const { 
-                listId, 
+            const {
+                listId,
                 data: { tempId, label }
             } = itemRequest;
-    
+
             const listIdx = getListIndex(listId);
             const list = imaginaryDB.lists[listIdx];
-            
+
             let id = tempId;
             if (validateUuid(tempId) === false) {
                 id = uuid();
-    
+
                 // TODO: emit correction here
             }
-    
+
             const newItem = {
                 id,
                 label,
@@ -277,13 +277,13 @@ io.on('connection', socket => {
             };
             console.log(newItem);
             list.items.push(newItem);
-    
+
             socket.broadcast.emit('todo/addItem', {
                 listId: itemRequest.listId,
                 data: newItem,
             });
         });
-    
+
         type TodoEditItemRequest = {
             listId: string,
             itemId: string,
@@ -293,24 +293,24 @@ io.on('connection', socket => {
             }
         }
         socket.on('todo/editItem', (itemRequest: TodoEditItemRequest) => {
-            const { 
+            const {
                 listId,
-                itemId, 
+                itemId,
                 data: { label, isDone }
             } = itemRequest;
-    
+
             const listIdx = getListIndex(listId);
             const list = imaginaryDB.lists[listIdx];
-    
+
             const itemIdx = list.items.findIndex(item => item.id === itemId);
-            
+
             if (label !== undefined) {
                 list.items[itemIdx].label = label;
             }
             if (isDone !== undefined) {
                 list.items[itemIdx].isDone = isDone;
             }
-    
+
             socket.broadcast.emit('todo/editItem', itemRequest);
         });
 
