@@ -1,3 +1,5 @@
+import { ErrorRequestHandler } from 'express';
+
 export const generateRandomColor = () => {
     const r = Math.floor(Math.random() * 128) + 128;
     const g = Math.floor(Math.random() * 128) + 128;
@@ -21,5 +23,16 @@ export class ClientError extends Error {
         this.sendReason = typeof sendReason === 'boolean' ? sendReason : true;
         this.code = code || 404;
         this.date = new Date();
+    }
+}
+
+export const clientErrorHandler: ErrorRequestHandler = (err, _req, res, next) => {
+    if (err instanceof ClientError) {
+        res.status(err.code).json({
+            success: false,
+            reason: err.sendReason ? err.message : undefined,
+        });
+    } else {
+        next(err);
     }
 }

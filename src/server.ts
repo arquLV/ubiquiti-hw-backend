@@ -14,10 +14,10 @@ import passport from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
 // import redis from 'redis';
 
-import { v4 as uuid, validate as validateUuid } from 'uuid';
+import { v4 as uuid } from 'uuid';
 import bcrypt from 'bcrypt';
 
-import { generateRandomColor, ClientError } from './utils';
+import { generateRandomColor, ClientError, clientErrorHandler } from './utils';
 import { ImaginaryDBSchema, OnlineUserStore } from './types';
 import setupSocketHandlers from './sockets';
 
@@ -59,8 +59,6 @@ app.use(todoSession);
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-
 
 const imaginaryDB: ImaginaryDBSchema = {
     users: [],
@@ -111,7 +109,12 @@ passport.use('local', new LocalStrategy({
 app.post('/login', passport.authenticate('local', {
     failWithError: true,
 }), (req, res) => {
-    console.log(req.user);
+    const user = req.user as { username: string, color: string };
+
+    res.json({
+        username: user.username,
+        color: user.color,
+    });
 });
 
 app.post('/signup', async (req, res, next) => {
@@ -165,23 +168,44 @@ app.post('/checkAuth', (req, res) => {
     }
 });
 
-app.get('/todos', (req, res) => {
+app.post('/logout', (req, res) => {
+    req.logout();
     res.json({
-        lists: imaginaryDB.lists,
+        success: true,
     });
+})
+
+app.get('/todos', (req, res) => {
+    if (req.user) {
+        res.json({
+            lists: imaginaryDB.lists,
+        });
+    } else {
+        res.json({
+            success: false,
+        })
+    }
 });
 
 /**
  * Returns a list of currently online users
  */
 app.get('/users', (req, res) => {
-    const onlineUserIds = Object.keys(onlineUsers);
-    const users = imaginaryDB.users.filter(user => onlineUserIds.includes(user.id));
-
-    res.json({
-        users,
-    });
+    if (req.user) {
+        const onlineUserIds = Object.keys(onlineUsers);
+        const users = imaginaryDB.users.filter(user => onlineUserIds.includes(user.id));
+    
+        res.json({
+            users,
+        });
+    } else {
+        res.json({
+            success: false,
+        });
+    }
 });
+
+app.use(clientErrorHandler);
 
 
 const httpServer = http.createServer(app);

@@ -21,3 +21,6 @@ A few additional user stories were planned but left half-way there as time was s
 
 If there are any questions, please feel free to ask. I operated on the mindset that for a task
 like this it's better to do things from scratch and leave some rough edges than to import lots of ready-made stuff.
+
+![App screenshot](todoquiti-screenshot.jpg?raw=true "App screenshot")
+
