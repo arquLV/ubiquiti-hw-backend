@@ -24,3 +24,5 @@ like this it's better to do things from scratch and leave some rough edges than 
 
 ![App screenshot](todoquiti-screenshot.jpg?raw=true "App screenshot")
 
+### To start locally:
+`yarn start-dev`
