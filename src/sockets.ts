@@ -63,6 +63,18 @@ const setupSocketHandlers = (io: socketIo.Server, imaginaryDB: ImaginaryDBSchema
                 });
     
             });
+
+            socket.on('todo/delete', (deleteRequest: { listId: string}) => {
+                const { listId } = deleteRequest;
+                const lists = imaginaryDB.lists.filter(list => list.id !== listId);
+
+                imaginaryDB.lists = lists;
+                imaginaryDB.listsIndex = {};
+
+                socket.broadcast.emit('todo/delete', {
+                    listId
+                });
+            });
     
             type TodoUpdateRequest = {
                 listId: string,
