@@ -18,6 +18,8 @@ import { v4 as uuid, validate as validateUuid } from 'uuid';
 import bcrypt from 'bcrypt';
 
 import { generateRandomColor, ClientError } from './utils';
+import { ImaginaryDBSchema, OnlineUserStore } from './types';
+import setupSocketHandlers from './sockets';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -59,44 +61,14 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 
-type ImaginaryDBSchema = {
-    users: {
-        id: string,
-        username: string,
-        pwdHash: string,
-        color: string,
-    }[],
-    lists: {
-        id: string,
-        title: string,
-        items: {
-            id: string,
-            label: string,
-            isDone: boolean,
-        }[],
-    }[],
 
-    listsIndex: {
-        [listId: string]: number,
-    }
-}
 const imaginaryDB: ImaginaryDBSchema = {
     users: [],
     lists: [],
 
     listsIndex: {},
 }
-
-const getListIndex = (listId: string) => {
-    if (imaginaryDB.listsIndex[listId] !== undefined) {
-        return imaginaryDB.listsIndex[listId];
-    } else {
-        const listIdx = imaginaryDB.lists.findIndex(list => list.id === listId);
-        imaginaryDB.listsIndex[listId] = listIdx;
-
-        return listIdx;
-    }
-}
+const onlineUsers: OnlineUserStore = {};
 
 
 passport.serializeUser((user: { id: string }, done) => {
@@ -148,8 +120,6 @@ app.post('/signup', async (req, res, next) => {
         return next(new ClientError('User already exists', 409));
     }
 
-    res.cookie('test', 'yolo');
-
     try {
         const pwdHash = await bcrypt.hash(password, 12);
 
@@ -179,7 +149,6 @@ app.post('/signup', async (req, res, next) => {
 });
 
 app.post('/checkAuth', (req, res) => {
-    console.log(req.cookies);
     const user = req.user as { username: string, color: string };
     if (user) {
         res.json({
@@ -202,150 +171,24 @@ app.get('/todos', (req, res) => {
     });
 });
 
+/**
+ * Returns a list of currently online users
+ */
+app.get('/users', (req, res) => {
+    const onlineUserIds = Object.keys(onlineUsers);
+    const users = imaginaryDB.users.filter(user => onlineUserIds.includes(user.id));
+
+    res.json({
+        users,
+    });
+});
+
 
 const httpServer = http.createServer(app);
 const io = socketIo(httpServer);
 io.use(sharedSession(todoSession, {
     autoSave: true,
 }));
-
-io.on('connection', socket => {
-    socket.handshake.session.reload(async err => {
-        if (err) {
-            console.log('Unknown user socket connection request.');
-            // console.error(err);
-            return;
-        }
-
-        const socketUserId = socket.handshake.session.passport.user;
-
-        const socketUser = imaginaryDB.users.find(u => u.id === socketUserId);
-        const socketUserName = socketUser.username;
-
-        console.log(`New connection! User ${socketUserId} on ${socket.id}`);
-
-        // Let others know!
-        socket.broadcast.emit('users/new', {
-            username: socketUserName,
-            color: socketUser.color,
-        });
-
-        socket.on('todo/create', () => {
-            const listId = uuid();
-
-            const listsLength = imaginaryDB.lists.push({
-                id: listId,
-                title: '',
-                items: [],
-            });
-            imaginaryDB.listsIndex[listId] = listsLength - 1;
-
-            io.emit('todo/add', {
-                listId,
-            });
-
-        });
-
-        type TodoUpdateRequest = {
-            listId: string,
-            data: {
-                title?: string,
-            }
-        }
-        socket.on('todo/update', (update: TodoUpdateRequest) => {
-            const listIdx = getListIndex(update.listId);
-            const list = imaginaryDB.lists[listIdx];
-
-            const { data } = update;
-            if (data.title !== undefined) {
-                list.title = data.title;
-            }
-
-            socket.broadcast.emit('todo/update', update);
-        });
-
-        type TodoNewItemRequest = {
-            listId: string,
-            data: {
-                tempId: string,
-                label: string,
-            }
-        }
-        socket.on('todo/addItem', (itemRequest: TodoNewItemRequest) => {
-            const {
-                listId,
-                data: { tempId, label }
-            } = itemRequest;
-
-            const listIdx = getListIndex(listId);
-            const list = imaginaryDB.lists[listIdx];
-
-            let id = tempId;
-            if (validateUuid(tempId) === false) {
-                id = uuid();
-
-                // TODO: emit correction here
-            }
-
-            const newItem = {
-                id,
-                label,
-                isDone: false,
-            };
-            console.log(newItem);
-            list.items.push(newItem);
-
-            socket.broadcast.emit('todo/addItem', {
-                listId: itemRequest.listId,
-                data: newItem,
-            });
-        });
-
-        type TodoEditItemRequest = {
-            listId: string,
-            itemId: string,
-            data: {
-                label?: string,
-                isDone?: boolean,
-            }
-        }
-        socket.on('todo/editItem', (itemRequest: TodoEditItemRequest) => {
-            const {
-                listId,
-                itemId,
-                data: { label, isDone }
-            } = itemRequest;
-
-            const listIdx = getListIndex(listId);
-            const list = imaginaryDB.lists[listIdx];
-
-            const itemIdx = list.items.findIndex(item => item.id === itemId);
-
-            if (label !== undefined) {
-                list.items[itemIdx].label = label;
-            }
-            if (isDone !== undefined) {
-                list.items[itemIdx].isDone = isDone;
-            }
-
-            socket.broadcast.emit('todo/editItem', itemRequest);
-        });
-
-        type UserCursorUpdate = {
-            id: string[],
-            start: number,
-            end: number,
-        }
-        socket.on('user-cursor', (update: UserCursorUpdate) => {
-            socket.broadcast.emit('user-cursor', {
-                username: socketUserName,
-                id: update.id,
-                start: update.start,
-                end: update.end,
-            });
-        });
-    });
-
-});
+setupSocketHandlers(io, imaginaryDB, onlineUsers);
 
 httpServer.listen(port, () => { console.log (`Listening on port ${port}`)});
